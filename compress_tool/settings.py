@@ -5,13 +5,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from .constants import APP_DIR_NAME
+from .constants import APP_DIR_NAME, DEFAULT_VIDEO_PROFILE, VIDEO_PROFILE_IDS, VIDEO_PROFILE_SIZE
 
 
 @dataclass
 class GuiSettings:
-    video_size_mode: bool = False
+    video_profile: str = DEFAULT_VIDEO_PROFILE
     image_mode: str = "lossy"
+    window_geometry: str = ""
 
 
 def settings_path() -> Path:
@@ -66,7 +67,14 @@ def _coerce_settings(data: dict[str, Any]) -> GuiSettings:
     image_mode = data.get("image_mode")
     if image_mode not in {"lossy", "original"}:
         image_mode = "lossy"
+    video_profile = data.get("video_profile")
+    if video_profile not in VIDEO_PROFILE_IDS:
+        video_profile = VIDEO_PROFILE_SIZE if data.get("video_size_mode", False) else DEFAULT_VIDEO_PROFILE
+    window_geometry = data.get("window_geometry")
+    if not isinstance(window_geometry, str):
+        window_geometry = ""
     return GuiSettings(
-        video_size_mode=bool(data.get("video_size_mode", False)),
+        video_profile=video_profile,
         image_mode=image_mode,
+        window_geometry=window_geometry,
     )

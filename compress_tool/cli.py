@@ -14,7 +14,7 @@ from .image import (
     process_image_cli,
 )
 from .ui import console
-from .video import compress_video, find_all_videos
+from .video import compress_video, find_all_videos, video_output_path, video_profile_choices
 
 
 GUI_DEPENDENCY_HELP = """GUI dependencies are missing.
@@ -45,6 +45,15 @@ def build_default_parser() -> argparse.ArgumentParser:
     parser.add_argument("inputs", nargs="+")
     parser.add_argument("-crf", type=int, default=30)
     parser.add_argument("-preset", default="slow")
+    parser.add_argument(
+        "--video-profile",
+        choices=video_profile_choices(),
+        default="crf",
+        help=(
+            "Video profile: crf, size, crf480, crf720, "
+            "gif120, gif180, gif, or gif480."
+        ),
+    )
     parser.add_argument("--image-mode", choices=("lossy", "original"), default="lossy")
     parser.add_argument(
         "--image-format",
@@ -98,7 +107,7 @@ def run_video_size_mode(inputs: list[str]) -> None:
         console.log("No videos found.")
         sys.exit(0)
 
-    tasks = [(v, v.with_name(f"{v.stem}_smaller.mp4")) for v in videos]
+    tasks = [(v, video_output_path(v, "size")) for v in videos]
     with Progress(
         TextColumn("[bold green]{task.description}"),
         BarColumn(bar_width=None),
@@ -121,7 +130,7 @@ def run_mixed_default(args: list[str]) -> None:
     images = find_all_images(opts.inputs, quiet=True)
 
     work: list[tuple[str, Path, Path]] = []
-    work += [("video", v, v.with_name(f"{v.stem}_compressed.mp4")) for v in videos]
+    work += [("video", v, video_output_path(v, opts.video_profile)) for v in videos]
     work += [("image", img, image_output_path(img, opts.image_mode, output_format)) for img in images]
     if not work:
         console.log("No supported media found.")
@@ -137,7 +146,17 @@ def run_mixed_default(args: list[str]) -> None:
         futures = []
         for kind, inp, out in work:
             if kind == "video":
-                futures.append(exe.submit(compress_video, inp, out, "crf", opts.crf, opts.preset, prog))
+                futures.append(
+                    exe.submit(
+                        compress_video,
+                        inp,
+                        out,
+                        opts.video_profile,
+                        opts.crf,
+                        opts.preset,
+                        prog,
+                    )
+                )
             else:
                 futures.append(exe.submit(process_image_cli, inp, out, opts.image_mode, output_format, prog))
         for _ in as_completed(futures):

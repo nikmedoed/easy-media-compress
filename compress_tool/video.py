@@ -12,6 +12,17 @@ from .constants import (
     SIZE_AARGS,
     TARGET_MB,
     VIDEO_EXTS,
+    DEFAULT_VIDEO_PROFILE,
+    VIDEO_PROFILE_480,
+    VIDEO_PROFILE_720,
+    VIDEO_PROFILE_CRF,
+    VIDEO_PROFILE_GIF,
+    VIDEO_PROFILE_GIF_120,
+    VIDEO_PROFILE_GIF_180,
+    VIDEO_PROFILE_GIF_480,
+    VIDEO_PROFILE_IDS,
+    VIDEO_PROFILE_LABELS,
+    VIDEO_PROFILE_SIZE,
 )
 from .ffmpeg import ffmpeg_cmd, ffprobe_cmd
 from .ui import console
@@ -138,12 +149,120 @@ def run_with_progress(cmd: list[str], duration: float, task, progress: Progress)
     run_ffmpeg_with_progress(cmd, duration, lambda sec: progress.update(task, completed=sec))
 
 
+def normalize_video_profile(profile: str | None) -> str:
+    if not profile:
+        return DEFAULT_VIDEO_PROFILE
+    aliases = {
+        "compress": VIDEO_PROFILE_CRF,
+        "5": VIDEO_PROFILE_SIZE,
+        "5mb": VIDEO_PROFILE_SIZE,
+        "480": VIDEO_PROFILE_480,
+        "720": VIDEO_PROFILE_720,
+        "gif120": VIDEO_PROFILE_GIF_120,
+        "gif180": VIDEO_PROFILE_GIF_180,
+        "gif240": VIDEO_PROFILE_GIF,
+    }
+    profile = aliases.get(profile.lower(), profile.lower())
+    return profile if profile in VIDEO_PROFILE_IDS else DEFAULT_VIDEO_PROFILE
+
+
+def video_profile_label(profile: str) -> str:
+    return VIDEO_PROFILE_LABELS[normalize_video_profile(profile)]
+
+
+def video_profile_choices() -> tuple[str, ...]:
+    return tuple(VIDEO_PROFILE_LABELS.keys())
+
+
+def video_profile_labels() -> tuple[str, ...]:
+    return tuple(VIDEO_PROFILE_LABELS.values())
+
+
+def video_profile_from_label(label: str) -> str:
+    for profile, profile_label in VIDEO_PROFILE_LABELS.items():
+        if label == profile_label:
+            return profile
+    return normalize_video_profile(label)
+
+
+def alternate_video_profile(profile: str) -> str:
+    profile = normalize_video_profile(profile)
+    return VIDEO_PROFILE_CRF if profile != VIDEO_PROFILE_CRF else VIDEO_PROFILE_SIZE
+
+
+def gif_profile_target(profile: str) -> int | None:
+    return {
+        VIDEO_PROFILE_GIF_120: 120,
+        VIDEO_PROFILE_GIF_180: 180,
+        VIDEO_PROFILE_GIF: 240,
+        VIDEO_PROFILE_GIF_480: 480,
+    }.get(normalize_video_profile(profile))
+
+
+def video_output_path(path: Path, profile: str) -> Path:
+    profile = normalize_video_profile(profile)
+    if profile == VIDEO_PROFILE_SIZE:
+        return path.with_name(f"{path.stem}_smaller.mp4")
+    if gif_profile_target(profile) is not None:
+        return path.with_name(f"{path.stem}_converted.gif")
+    return path.with_name(f"{path.stem}_compressed.mp4")
+
+
+def _even_dimension(value: float) -> int:
+    return max(2, int(value) // 2 * 2)
+
+
+def short_side_scale_filter(path: Path, target: int, *, no_upscale: bool = True) -> str | None:
+    width, height = probe_video(path)
+    short_side = min(width, height)
+    if short_side <= 0:
+        return None
+    scale = target / short_side
+    if no_upscale and scale >= 1:
+        return None
+    width2 = _even_dimension(width * scale)
+    height2 = _even_dimension(height * scale)
+    return f"scale={width2}:{height2}"
+
+
+def gif_scale_filter(target: int) -> str:
+    return (
+        f"fps=15,"
+        f"scale=if(lt(iw\\,ih)\\,{target}\\,-2):"
+        f"if(lt(iw\\,ih)\\,-2\\,{target}):flags=lanczos"
+    )
+
+
 def build_video_args(path: Path, output: Path, mode: str, crf: int, preset: str) -> list[str]:
+    mode = normalize_video_profile(mode)
     dur = get_duration(path)
+
+    gif_target = gif_profile_target(mode)
+    if gif_target is not None:
+        return [
+            ffmpeg_cmd(),
+            "-y",
+            "-i",
+            str(path),
+            "-vf",
+            gif_scale_filter(gif_target),
+            "-loop",
+            "0",
+            str(output),
+        ]
+
     base = [ffmpeg_cmd(), "-y", "-i", str(path)] + COMMON_VARGS
 
-    if mode == "crf":
+    if mode == VIDEO_PROFILE_CRF:
         return base + ["-preset", preset, "-crf", str(crf)] + COMMON_AARGS + [str(output)]
+
+    if mode in {VIDEO_PROFILE_480, VIDEO_PROFILE_720}:
+        target = 480 if mode == VIDEO_PROFILE_480 else 720
+        vf = short_side_scale_filter(path, target, no_upscale=True)
+        args = base
+        if vf:
+            args += ["-vf", vf]
+        return args + ["-preset", preset, "-crf", str(crf)] + COMMON_AARGS + [str(output)]
 
     w, h = probe_video(path)
     target_b = int(TARGET_MB * 1024 * 1024)
@@ -159,14 +278,15 @@ def build_video_args(path: Path, output: Path, mode: str, crf: int, preset: str)
 
 
 def compress_video(path: Path, output: Path, mode: str, crf: int, preset: str, progress: Progress):
+    mode = normalize_video_profile(mode)
     dur = get_duration(path)
     task = progress.add_task(path.name, total=dur)
-    console.log(f"Starting video {mode}: {path.name}")
+    console.log(f"Starting video {video_profile_label(mode)}: {path.name}")
 
     try:
         args = build_video_args(path, output, mode, crf, preset)
         run_with_progress(args, dur, task, progress)
-        if mode == "size":
+        if mode == VIDEO_PROFILE_SIZE or gif_profile_target(mode) is not None:
             size_mb = output.stat().st_size / (1024 * 1024)
             console.log(f"Completed: {path.name} -> {size_mb:.2f} MB")
         else:

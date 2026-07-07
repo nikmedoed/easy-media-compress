@@ -43,7 +43,7 @@ small modules under `compress_tool/`.
 * **Mixed-media CLI mode**: videos and photos can be passed together.
 * **Image-only CLI mode**: `compress.py image ...`.
 * **GUI now accepts images and videos**.
-* **GUI remembers settings** for the `5MB video` toggle and `Photo` mode.
+* **GUI remembers settings** for the video profile and `Photo` mode.
 
 ## Features
 
@@ -61,7 +61,7 @@ small modules under `compress_tool/`.
   remaining.
 * **Drag-and-drop GUI**: Launch without arguments or with `--gui`. Files convert
   in parallel with per-file progress and an overall progress bar.
-* **Persisted GUI settings**: The GUI remembers the last `5MB video` toggle and
+* **Persisted GUI settings**: The GUI remembers the last video profile and
   selected photo mode between launches.
 * **Self-contained FFmpeg handling**: Video mode looks for FFmpeg next to the
   app and in `PATH`; when it is missing, the tool can install it through the OS
@@ -412,12 +412,18 @@ Videos use CRF mode by default. Images use `lossy` mode by default.
 * **`-crf`**: Integer Constant Rate Factor for video (default: 30).
 * **`-preset`**: FFmpeg encoding speed preset for video, for example
   `ultrafast`, `fast`, `medium`, `slow` (default: `slow`).
+* **`--video-profile`**: Video output profile. Choices are `crf`, `size`,
+  `crf480`, `crf720`, `gif120`, `gif180`, `gif`, and `gif480`
+  (default: `crf`).
 * **`--image-mode`**: `lossy` or `original` (default: `lossy`).
 * **`--image-format`**: `jpg`, `png`, or `webp` (default: `jpg`).
 
 Default output names:
 
 * video CRF: `name_compressed.mp4`
+* video CRF + 480/720 short side: `name_compressed.mp4`
+* video GIF 120p/180p/240p/480p short side at 15 fps:
+  `name_converted.gif`
 * image lossy: `name_compressed.jpg`
 * image original: `name_converted.jpg`
 
@@ -488,12 +494,14 @@ progress, and the top bar shows overall progress.
 
 GUI controls:
 
-* **5MB video**: Toggles video size-targeting mode for newly added videos.
+* **Video**: Selects the profile for newly added videos: `MP4`, `5 MB`,
+  `MP4 480p`, `MP4 720p`, `GIF 120p`, `GIF 180p`, `GIF 240p`, or
+  `GIF 480p`.
 * **Photo**: Selects `lossy` or `original` for newly added images.
 * **`<>` column**: Enqueues the same file again with the alternate mode.
 * Double-click a row to open the source file's folder.
 
-The GUI remembers the last `5MB video` and `Photo` settings between launches.
+The GUI remembers the last `Video` and `Photo` settings between launches.
 
 Persisted settings paths:
 

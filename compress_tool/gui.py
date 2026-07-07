@@ -6,7 +6,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from tkinter import BooleanVar, StringVar, filedialog, ttk
+from tkinter import StringVar, filedialog, ttk
 
 import tkinter as tk
 from tkinter import messagebox
@@ -17,7 +17,15 @@ from .image import convert_image, get_image_info, image_output_path
 from .settings import GuiSettings, load_gui_settings, save_gui_settings
 from .ui import console, ensure_icon_ico
 from .updater import UpdateInfo, check_for_update, current_version, download_and_install_update
-from .video import compress_video_gui, get_video_info
+from .video import (
+    alternate_video_profile,
+    compress_video_gui,
+    get_video_info,
+    video_output_path,
+    video_profile_from_label,
+    video_profile_label,
+    video_profile_labels,
+)
 
 
 def is_dark_mode() -> bool:
@@ -79,6 +87,12 @@ def run_gui():
 
     root = TkinterDnD.Tk()
     root.title(APP_NAME)
+    saved_settings = load_gui_settings()
+    if saved_settings.window_geometry:
+        try:
+            root.geometry(saved_settings.window_geometry)
+        except tk.TclError:
+            pass
     try:
         icon_dir = ensure_icon_ico()
         if sys.platform.startswith("win"):
@@ -119,24 +133,27 @@ def run_gui():
     top = ttk.Frame(root)
     top.pack(fill="x")
 
-    saved_settings = load_gui_settings()
-
-    def persist_current_settings(*_args):
-        save_gui_settings(
-            GuiSettings(
-                video_size_mode=bool(size_var.get()),
-                image_mode=image_mode_var.get(),
-            )
+    def current_settings() -> GuiSettings:
+        return GuiSettings(
+            video_profile=video_profile_from_label(video_profile_var.get()),
+            image_mode=image_mode_var.get(),
+            window_geometry=root.geometry(),
         )
 
-    size_var = BooleanVar(value=saved_settings.video_size_mode)
-    chk = ttk.Checkbutton(
+    def persist_current_settings(*_args):
+        save_gui_settings(current_settings())
+
+    video_profile_var = StringVar(value=video_profile_label(saved_settings.video_profile))
+    ttk.Label(top, text="Video").pack(side="left", padx=(5, 3), pady=5)
+    video_profile = ttk.Combobox(
         top,
-        text="5MB video",
-        variable=size_var,
-        command=persist_current_settings,
+        textvariable=video_profile_var,
+        values=video_profile_labels(),
+        state="readonly",
+        width=10,
     )
-    chk.pack(side="left", padx=5, pady=5)
+    video_profile.pack(side="left", padx=3, pady=5)
+    video_profile.bind("<<ComboboxSelected>>", persist_current_settings)
 
     image_mode_var = StringVar(value=saved_settings.image_mode)
     ttk.Label(top, text="Photo").pack(side="left", padx=(10, 3), pady=5)
@@ -383,7 +400,11 @@ def run_gui():
         if suffix in VIDEO_EXTS:
             dur, codec, _br = get_video_info(path)
             details = format_duration(dur)
-            mode = mode_override or ("size" if size_var.get() else "crf")
+            mode = (
+                video_profile_from_label(mode_override)
+                if mode_override
+                else video_profile_from_label(video_profile_var.get())
+            )
             kind = "video"
         elif suffix in IMAGE_EXTS:
             image_info = get_image_info(path)
@@ -406,7 +427,7 @@ def run_gui():
                 details,
                 f"{size_mb:.1f} MB",
                 "",
-                mode,
+                video_profile_label(str(mode)) if kind == "video" else mode,
                 "<>",
                 progress_bar_text(0),
             ),
@@ -453,7 +474,7 @@ def run_gui():
             return
         current = info[row]["mode"]
         if info[row]["kind"] == "video":
-            mode = "crf" if current == "size" else "size"
+            mode = alternate_video_profile(str(current))
         else:
             mode = "original" if current == "lossy" else "lossy"
         add_files([str(info[row]["path"])], mode)
@@ -474,7 +495,7 @@ def run_gui():
         mode = info[row]["mode"]
         kind = info[row]["kind"]
         if kind == "video":
-            out = path.with_name(f"{path.stem}_smaller.mp4" if mode == "size" else f"{path.stem}_compressed.mp4")
+            out = video_output_path(path, str(mode))
         else:
             out = image_output_path(path, str(mode), "jpg")
 
@@ -500,6 +521,11 @@ def run_gui():
             console.log(f"[red]Error {path.name}: {e}[/]")
             gui_queue.put(("error", row, str(e)))
 
+    def on_close():
+        persist_current_settings()
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_close)
     root.after(100, scroll_to_current)
     root.after(100, process_gui_queue)
     root.after(1000, check_idle)
