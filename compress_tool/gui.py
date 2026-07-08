@@ -2,8 +2,8 @@ import os
 import queue
 import subprocess
 import sys
-import threading
 import time
+import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tkinter import StringVar, filedialog, ttk
@@ -16,7 +16,7 @@ from .constants import APP_NAME, CREATE_NO_WINDOW, IMAGE_EXTS, MAX_WORKERS, VIDE
 from .image import convert_image, get_image_info, image_output_path
 from .settings import GuiSettings, load_gui_settings, save_gui_settings
 from .ui import console, ensure_icon_ico
-from .updater import UpdateInfo, check_for_update, current_version, download_and_install_update
+from .updater import current_version, start_background_updater
 from .video import (
     alternate_video_profile,
     compress_video_gui,
@@ -26,6 +26,8 @@ from .video import (
     video_profile_label,
     video_profile_labels,
 )
+
+AUTHOR_URL = "https://nikmedoed.com/"
 
 
 def is_dark_mode() -> bool:
@@ -181,7 +183,23 @@ def run_gui():
         "alt",
         "progress",
     )
-    tree = ttk.Treeview(root, columns=columns, show="headings")
+    bottom = ttk.Frame(root)
+    bottom.pack(side="bottom", fill="x", padx=5, pady=(0, 5))
+    ttk.Separator(bottom, orient="horizontal").pack(fill="x", pady=(0, 4))
+    ttk.Label(bottom, text=f"Version {current_version()} | Author: Muromtsev Nikita | ").pack(side="left")
+    author_link = ttk.Label(
+        bottom,
+        text=AUTHOR_URL,
+        foreground="#0b63ce",
+        cursor="hand2",
+    )
+    author_link.pack(side="left")
+    author_link.bind("<Button-1>", lambda _event: webbrowser.open(AUTHOR_URL))
+
+    table_frame = ttk.Frame(root)
+    table_frame.pack(side="top", fill="both", expand=True, padx=5, pady=(0, 5))
+
+    tree = ttk.Treeview(table_frame, columns=columns, show="headings")
     tree.tag_configure("waiting", background=waiting_bg, foreground=fg)
     tree.tag_configure("in_progress", background=prog_bg, foreground=fg)
     tree.tag_configure("completed", background=completed_bg, foreground=fg)
@@ -202,7 +220,7 @@ def run_gui():
         tree.column(c, width=widths[c], anchor="center")
     tree.column("file", anchor="w")
 
-    vsb = ttk.Scrollbar(root, orient="vertical")
+    vsb = ttk.Scrollbar(table_frame, orient="vertical")
     vsb.pack(side="right", fill="y")
 
     auto_scroll = True
@@ -221,7 +239,8 @@ def run_gui():
 
     vsb.config(command=yview)
     tree.configure(yscrollcommand=vsb.set)
-    tree.pack(fill="both", expand=True, padx=5, pady=5)
+    tree.pack(side="left", fill="both", expand=True)
+
     root.bind_all("<MouseWheel>", user_action, add="+")
     root.bind_all("<Button-4>", user_action, add="+")
     root.bind_all("<Button-5>", user_action, add="+")
@@ -276,67 +295,10 @@ def run_gui():
     overall_bar.pack(side="left", fill="x", expand=True, padx=5)
     overall_label = ttk.Label(top, text="0/0")
     overall_label.pack(side="left", padx=5)
-    update_label = ttk.Label(top, text="")
-    update_label.pack(side="left", padx=5)
 
     executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
     gui_queue: "queue.Queue[tuple]" = queue.Queue()
     shown_errors: set[str] = set()
-
-    def set_update_label(text: str) -> None:
-        update_label.config(text=text)
-        root.update_idletasks()
-
-    def offer_update(update: UpdateInfo) -> None:
-        if total != done:
-            messagebox.showinfo(
-                APP_NAME,
-                "An update is available. Finish the current conversions, then restart the app to update.",
-            )
-            return
-
-        answer = messagebox.askyesno(
-            APP_NAME,
-            (
-                f"Version {update.version} is available.\n\n"
-                f"Current version: {current_version()}\n"
-                f"Download and install it now?"
-            ),
-        )
-        if not answer:
-            return
-
-        set_update_label("Updating...")
-
-        def progress(downloaded: int, total: int | None) -> None:
-            if not total:
-                return
-            percent = min(100, int(downloaded * 100 / total))
-            root.after(0, set_update_label, f"Updating {percent}%")
-
-        def install_worker() -> None:
-            try:
-                download_and_install_update(update, relaunch_args=["--gui"], progress=progress)
-            except Exception as exc:
-                root.after(0, set_update_label, "")
-                root.after(0, messagebox.showerror, APP_NAME, f"Could not update:\n{exc}")
-                return
-            root.after(0, root.destroy)
-
-        threading.Thread(target=install_worker, daemon=True).start()
-
-    def check_updates_in_background() -> None:
-        def worker() -> None:
-            try:
-                update = check_for_update()
-            except Exception as exc:
-                console.log(f"[yellow]Update check skipped: {exc}[/]")
-                return
-            if update:
-                root.after(0, set_update_label, f"Update {update.version}")
-                root.after(0, offer_update, update)
-
-        threading.Thread(target=worker, daemon=True).start()
 
     def update_overall():
         if total:
@@ -529,5 +491,5 @@ def run_gui():
     root.after(100, scroll_to_current)
     root.after(100, process_gui_queue)
     root.after(1000, check_idle)
-    root.after(1500, check_updates_in_background)
+    root.after(1500, lambda: start_background_updater(current_version()))
     root.mainloop()

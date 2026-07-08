@@ -274,10 +274,11 @@ FFmpeg is missing.
 
 Packaged builds check GitHub Releases for updates when the GUI starts. The
 check is disabled when running from source, so local development never replaces
-files. On Windows, the `.exe` downloads the latest `windows-x64.exe` asset,
-starts a small PowerShell helper, exits, replaces itself, and relaunches the
-GUI. macOS and Linux release assets are detected, but automatic replacement is
-not enabled for archive builds yet.
+files. On Windows, the `.exe` starts a detached helper copy in the background.
+The helper downloads the newest release `.exe` into the per-user update folder
+and replaces the app after the current process exits. macOS and Linux release
+assets are published, but automatic replacement is enabled only for Windows
+`.exe` builds.
 
 ### Release Builds
 

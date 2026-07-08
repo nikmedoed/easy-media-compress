@@ -165,6 +165,17 @@ def run_mixed_default(args: list[str]) -> None:
 
 def main():
     args = sys.argv[1:]
+    if args and args[0] == "--background-update":
+        parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument("--background-update", action="store_true")
+        parser.add_argument("--parent-pid", type=int, default=0)
+        parser.add_argument("--target-exe", default="")
+        parser.add_argument("--current-version", default=__version__)
+        opts = parser.parse_args(args)
+        from .updater import run_background_update
+
+        raise SystemExit(run_background_update(opts.parent_pid, opts.target_exe, opts.current_version))
+
     if args and args[0] in {"--version", "version"}:
         console.print(__version__)
         return
