@@ -1,3 +1,4 @@
+import json
 import subprocess
 from pathlib import Path
 
@@ -52,6 +53,7 @@ def get_duration(path: Path) -> float:
 
 
 def probe_video(path: Path) -> tuple[int, int]:
+    """Return the displayed video dimensions, including rotation metadata."""
     out = subprocess.run(
         [
             ffprobe_cmd(),
@@ -60,17 +62,32 @@ def probe_video(path: Path) -> tuple[int, int]:
             "-select_streams",
             "v:0",
             "-show_entries",
-            "stream=width,height",
+            "stream=width,height:stream_tags=rotate:stream_side_data=rotation",
             "-of",
-            "default=noprint_wrappers=1:nokey=1",
+            "json",
             str(path),
         ],
         stdout=subprocess.PIPE,
         text=True,
         check=True,
         creationflags=CREATE_NO_WINDOW,
-    ).stdout.strip().splitlines()
-    w, h = map(int, out)
+    ).stdout
+    stream = json.loads(out).get("streams", [{}])[0]
+    w, h = int(stream["width"]), int(stream["height"])
+
+    rotation = stream.get("tags", {}).get("rotate")
+    if rotation is None:
+        for side_data in stream.get("side_data_list", []):
+            if "rotation" in side_data:
+                rotation = side_data["rotation"]
+                break
+
+    try:
+        is_sideways = int(float(rotation or 0)) % 180 != 0
+    except (TypeError, ValueError):
+        is_sideways = False
+    if is_sideways:
+        w, h = h, w
     return w, h
 
 

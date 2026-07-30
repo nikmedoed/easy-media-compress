@@ -256,10 +256,9 @@ python scripts/build.py --install-deps
 ```
 
 The output is `dist\EasyMediaCompress.exe` on Windows and
-`dist/EasyMediaCompress` on macOS/Linux. It is a single universal executable:
-running it without arguments opens the GUI, while passing files, folders, or CLI
-options runs terminal mode. On Windows, GUI launch detaches from the temporary
-console immediately so the GUI does not keep a terminal window open.
+`dist/EasyMediaCompress` on macOS/Linux. On Windows, launching it without
+arguments opens the GUI without flashing a console window. Passing files,
+folders, or CLI options opens or reuses a terminal for the command-line mode.
 
 Build options:
 

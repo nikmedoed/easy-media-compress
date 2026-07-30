@@ -87,7 +87,7 @@ def build_target(name: str, entry: Path, *, onedir: bool) -> None:
         mode,
         "--name",
         name,
-        "--console",
+        "--windowed",
         "--add-data",
         data_arg(ROOT / "icon", "icon"),
         "--hidden-import",
