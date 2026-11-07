@@ -1,534 +1,72 @@
-# Easy Media Compress
+# Easy Media Compress — Rust
 
-A cross-platform, multithreaded Python tool for compressing videos with FFmpeg
-and converting photos with Pillow. It works on Windows, macOS, and Linux. The
-Windows context menu is optional; the CLI and GUI are intended to work on every
-supported system.
+Easy Media Compress is a Rust app for drag-and-drop video compression and photo conversion. Windows and macOS packages include their codecs.
 
-It supports mixed batches, a drag-and-drop GUI, HEIC photos from Samsung phones
-via `pillow-heif`, and two photo conversion modes: visually compressed output
-and high-quality conversion close to the original.
+On Windows, use [Windows Setup](https://github.com/nikmedoed/easy-media-compress/releases/latest/download/EasyMediaCompress-Setup-x64.exe) for a per-user install. Setup creates a Start menu shortcut and offers an Explorer action and a `compress` command on the user PATH. In Explorer, right-click a media file or folder and choose **Easy Media Compress**. On Windows 11 this action is under **Show more options**. It opens the GUI, adds the selection to the queue and uses the saved profiles. Remove the installed app from **Settings → Apps → Installed apps**.
 
-## Motivation
+For portable use, extract the entire Windows ZIP and open its `EasyMediaCompress.exe`. Keep the `tools` folder beside it.
 
-Initially, I discovered [rotato](https://tools.rotato.app/compress), which
-provided a great in-browser tool for compressing screen recordings. It worked
-efficiently, but I had to upload videos one by one and rely on the web
-interface. Later, they released a desktop version — but at a steep price. That
-didn't appeal to me.
+On macOS, open the disk image and drag **Easy Media Compress** to **Applications**. The CLI is in the app under `Contents/MacOS/compress`.
 
-Instead, I turned to the command line and explored FFmpeg's compression
-parameters. With the help of GPT, I optimized them and created this script.
+The Linux archive requires `ffmpeg`, `ffprobe` and ImageMagick 7 (`magick` with HEIC support) on PATH.
 
-Additionally, I needed a way to compress videos under 5 MB to embed them into my
-free Notion plan — so I implemented a size-targeting mode as well.
+Drop files or folders onto the window, or use **Add Media** to open the system file picker. Processing starts automatically and results appear beside the inputs. On Windows, subsequent Explorer calls add files to the open queue. Profiles and window size are saved in `%LOCALAPPDATA%\EasyMediaCompressRust\settings.json`. On first launch the app reads the Python version's settings if available.
 
-The tool has since grown from a video script into a media tool: it now converts
-photos, supports HEIC/HEIF input, has remembered GUI settings, and is split into
-small modules under `compress_tool/`.
+From the portable folder, use the console executable for scripting:
 
-## What's New
-
-* **Photo conversion** for common formats: JPG, PNG, BMP, TIFF, WebP, HEIC,
-  HEIF, and AVIF.
-* **Samsung HEIC support** through `pillow-heif`.
-* **Two photo modes**:
-  * `lossy`: keeps source resolution, applies EXIF orientation, and saves with
-    JPEG/WebP quality 60.
-  * `original`: keeps source resolution and saves with JPEG/WebP quality 95;
-    JPEG output preserves EXIF/ICC where Pillow supports it.
-* **No photo resizing in lossy mode**. Resolution is preserved unless EXIF
-  orientation changes width/height by rotating the image.
-* **Image output formats**: `jpg`, `png`, `webp`.
-* **Mixed-media CLI mode**: videos and photos can be passed together.
-* **Image-only CLI mode**: `compress.py image ...`.
-* **GUI now accepts images and videos**.
-* **GUI remembers settings** for the video profile and `Photo` mode.
-
-## Features
-
-* **Video CRF-based compression**: Adjust the Constant Rate Factor (`-crf`) and
-  encoding preset (`-preset`).
-* **Video size-based compression**: Target a fixed output size (~4.5 MB) by
-  automatically adjusting bitrate and resolution.
-* **Photo conversion**: Convert common image formats, including `.heic` and
-  `.heif`, to JPEG, PNG, or WebP.
-* **Batch processing**: Accept individual files or directories and recursively
-  search for supported media.
-* **Multithreaded execution**: Uses `ThreadPoolExecutor` for parallel processing
-  up to 4 workers by default.
-* **Rich progress display**: Shows real-time progress bars with estimated time
-  remaining.
-* **Drag-and-drop GUI**: Launch without arguments or with `--gui`. Files convert
-  in parallel with per-file progress and an overall progress bar.
-* **Persisted GUI settings**: The GUI remembers the last video profile and
-  selected photo mode between launches.
-* **Self-contained FFmpeg handling**: Video mode looks for FFmpeg next to the
-  app and in `PATH`; when it is missing, the tool can install it through the OS
-  package manager.
-* **Optional Windows integration**: `.bat` wrapper and PowerShell installer for
-  an **Easy Media Compress** Explorer context-menu entry.
-* **One-file builds**: PyInstaller builds are available for Windows, macOS, and
-  Linux. Builds stay small and use system FFmpeg at runtime.
-
-## Supported Formats
-
-### Videos
-
-`*.mp4`, `*.mkv`, `*.avi`, `*.mov`, `*.flv`, `*.wmv`, `*.webm`
-
-### Images
-
-`*.jpg`, `*.jpeg`, `*.jfif`, `*.png`, `*.bmp`, `*.tif`, `*.tiff`, `*.webp`,
-`*.heic`, `*.heif`, `*.avif`
-
-### Image Output Formats
-
-`jpg`, `png`, `webp`
-
-## Requirements
-
-Required on every system:
-
-* **Python 3.10+**
-* Python packages from `requirements.txt`
-
-Required for video conversion:
-
-* **FFmpeg and ffprobe**. The tool tries to install them when missing through
-  `winget` on Windows, `brew`/`port` on macOS, or `apt-get`, `dnf`, `pacman`,
-  `zypper`, or `apk` on Linux.
-
-Required for GUI mode:
-
-* Python `tkinter`
-* `tkinterdnd2`
-* Native TkDND support for drag-and-drop on systems where the wheel does not
-  bundle it correctly
-
-Optional Windows-only integration:
-
-* Windows
-* PowerShell
-* `win_install.ps1`
-
-## Recommended Usage Model
-
-The author's preferred way to use this project is from source rather than as a
-binary bundle. Keeping a local clone plus a virtual environment makes updates
-simple: pull the latest changes, update Python dependencies when needed, and
-continue using the same scripts, context-menu integration, and settings without
-reinstalling the app.
-
-Executable builds are still provided for less technical users who want to
-download one file and run it. They contain the Python app and its Python
-dependencies, but they do not bundle FFmpeg. When video conversion needs FFmpeg,
-the tool first checks the app folder and `PATH`; if FFmpeg is missing, it tries
-to install the system package through `winget` on Windows, `brew`/`port` on
-macOS, or a supported Linux package manager.
-
-## Installation
-
-1. **Clone or download** this repository:
-
-   ```bash
-   git clone <repository-url>
-   cd <repository-directory>
-   ```
-
-2. **Create and activate a virtual environment**:
-
-   Windows PowerShell:
-
-   ```powershell
-   py -3 -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   ```
-
-   macOS / Linux:
-
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-
-3. **Install Python dependencies**:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Install FFmpeg** manually only if automatic setup is not suitable. The tool
-   attempts to call your package manager when FFmpeg is missing.
-
-   Windows:
-
-   ```powershell
-   winget install --exact --id Gyan.FFmpeg --source winget
-   ```
-
-   macOS:
-
-   ```bash
-   brew install ffmpeg
-   ```
-
-   Debian / Ubuntu:
-
-   ```bash
-   sudo apt install ffmpeg python3-tk
-   ```
-
-   Fedora:
-
-   ```bash
-   sudo dnf install ffmpeg python3-tkinter
-   ```
-
-### macOS: TkinterDnD2 setup
-
-Drag-and-drop support on macOS requires the native TkDND library. Install the Python wrapper and place the appropriate binary in the folder used by `tkinterdnd2`:
-
-1. Install the wrapper:
-   ```bash
-   pip install tkinterdnd2
-   ```
-2. Download the [TkDND 2.9.5 macOS archive](https://github.com/petasis/tkdnd/releases/tag/tkdnd-release-test-v2.9.5) that matches your CPU (`arm64` or `x86_64`).
-3. Extract it and copy the `tkdnd2.9` folder into `.../site-packages/tkinterdnd2/tkdnd/osx-arm64/` (or `osx-x64/`). For a pyenv install of Python 3.13.5:
-   ```bash
-   cp -R tkdnd2.9.5 ~/.pyenv/versions/3.13.5/lib/python3.13/site-packages/tkinterdnd2/tkdnd/osx-arm64
-   ```
-4. Verify that TkDND loads:
-   ```bash
-   python - <<'PY'
-   from tkinterdnd2 import TkinterDnD
-   root = TkinterDnD.Tk()
-   print('tkdnd version:', root.TkdndVersion)
-   PY
-   ```
-
-   For a step-by-step walkthrough, see [this Stack Overflow answer](https://stackoverflow.com/a/79727593/11246533).
-
-### Setup bash / zsh
-
-This is optional, but convenient on macOS and Linux:
-
-```shell
-chmod +x compress.py
-sudo ln -sf /pathToScript/compress.py /usr/local/bin/compress
+```powershell
+.\compress.exe 'D:\Media'
+.\compress.exe 5 'D:\Videos'
+.\compress.exe 'D:\Videos\clip.mp4' -crf 28 -preset slow --video-profile crf720
+.\compress.exe image 'D:\Photos' --mode original --format webp
+.\compress.exe --help
 ```
 
-### Windows Context Menu & PowerShell Integration
+No arguments, `gui`, or `--gui` opens the window. Paths after `--gui` go directly into the visible queue. Folders are searched recursively. Double-click a filename to open its folder. **<>** in the **Alt** column runs the alternate profile.
 
-This section is Windows-only. The tool itself also works without this installer.
+**Stop** cancels the active and waiting jobs. When closing the window during conversion, choose **Stop and close** or **Keep open**. Completed outputs remain on disk.
 
-To add an **Easy Media Compress** entry to the right-click menu:
+- Video: MP4 (x264 CRF 30, preset slow, yuv420p, AAC), 480p/720p on the short side without upscaling, approximate 5 MB target (original 4.5 MiB one-pass budget), and GIFs at 15 fps with 120/180/240/480 px short sides.
+- Photo: JPEG/JFIF, PNG, BMP, TIFF, WebP, HEIC/HEIF and AVIF inputs; JPEG, PNG and WebP outputs. The GUI uses JPEG. No resizing. EXIF orientation is applied, JPEG transparency is flattened onto white, and original JPEG mode uses quality 95 with full chroma and preserves EXIF/ICC where supported. Lossy JPEG uses quality 60. Different codec libraries can produce different bytes from Pillow.
+- Outputs end in `_compressed`, `_converted`, or `_smaller`. If a name is taken, a numbered variant is created (e.g. `photo (2)_compressed.jpg`). Sources and previous results are kept.
 
-1. **Run** the PowerShell installer as Administrator:
+The portable-only `win_install.ps1` registers a shortcut and an Explorer action that point at the current folder. Use `-Uninstall` to remove those registrations. The Setup executable is the standard Windows installation route.
 
-   ```powershell
-   .\win_install.ps1
-   ```
+## Upgrade from 0.2.x
 
-2. **Restart** Windows Explorer or open a new File Explorer window.
+The old Windows standalone EXE can receive the release asset named `EasyMediaCompress.exe` through its existing updater. That asset is a migration launcher with Setup embedded. On first run it installs the Rust app and opens it. Later launches through the same path open the installed app, so an existing shortcut to the old standalone EXE keeps working. Running Windows Setup directly also works.
 
-3. **Right-click** any supported media file or folder and choose
-   **Easy Media Compress**.
+The Rust installer upgrades the existing installation in place. Close the app before running a new Setup. Installed Windows builds check for a newer release in the background and offer a link to its installer. Portable users can extract the new ZIP into a separate folder and macOS users can replace the app from the new DMG.
 
-The installer creates a local `.venv`, installs dependencies, ensures FFmpeg
-through `winget` when needed, adds a `compress` PowerShell helper, creates a
-Start Menu shortcut, and adds the Explorer context-menu entry.
+The new app imports legacy GUI preferences on first launch. For Python installs made from a source checkout, switch to the new Start menu shortcut and remove any PowerShell profile function that still calls the old `compress.py` or `compress.bat`.
 
-### Build an Executable
+## Run from source
 
-To build a one-file executable locally:
+On Windows, run `.\dev.ps1`. It prepares the portable codecs on the first run and opens a debug GUI using Cargo. With a custom Visual Studio installation, pass `-VcVars 'D:\path\to\vcvars64.bat'`. Rerun after editing source to see changes.
 
-Windows PowerShell:
+On macOS or Linux, put FFmpeg, ffprobe and ImageMagick 7 on PATH and run `cargo run --locked`. To try the CLI, use `cargo run --locked --bin compress -- --help`. The `MEDIA_COMPRESS_FFMPEG_DIR` and `MEDIA_COMPRESS_MAGICK_DIR` environment variables override tool resolution.
+
+## Build
+
+Use Rust stable, Visual Studio C++ Build Tools with a Windows SDK, `curl.exe`, and `tar.exe`. These are build-time requirements only.
 
 ```powershell
 .\build.ps1
+# For a nonstandard Visual Studio install, supply the x64 environment script:
+.\build.ps1 -VcVars 'D:\path\to\vcvars64.bat'
+.\scripts\smoke.ps1
+.\scripts\setup.ps1  # requires Inno Setup 6.3+ on the build machine
 ```
 
-macOS / Linux:
+The build script verifies pinned codec archives and stages the Windows x64 portable folder under `dist\EasyMediaCompress`. It locates the OpenMP DLL in the Build Tools redistributable files, or accepts a path via `-OpenMpDll`. Build downloads are cached in `.tools`.
 
-```bash
-python scripts/build.py --install-deps
+For macOS, run this on the target architecture with Xcode command-line tools and Rust stable:
+
+```sh
+brew install pkgconf dylibbundler ffmpeg libheif jpeg-turbo libpng libtiff webp little-cms2
+bash build-macos.sh
 ```
 
-The output is `dist\EasyMediaCompress.exe` on Windows and
-`dist/EasyMediaCompress` on macOS/Linux. On Windows, launching it without
-arguments opens the GUI without flashing a console window. Passing files,
-folders, or CLI options opens or reuses a terminal for the command-line mode.
+The script packages the app, CLI, and codecs for the build machine's architecture, tests the bundled tools, and creates a disk image in `dist/macos-<arch>`. Homebrew is used on the build machine. The disk image uses an ad hoc signature. Public distribution through Gatekeeper requires a Developer ID signature and notarization.
 
-Build options:
-
-```powershell
-.\build.ps1 -OneDir
-.\build.ps1 -Name EasyMediaCompress
-```
-
-Builds do not bundle FFmpeg binaries. They use the runtime resolver, which
-checks the app folder and `PATH`, then attempts a package-manager install if
-FFmpeg is missing.
-
-Packaged builds check GitHub Releases for updates when the GUI starts. The
-check is disabled when running from source, so local development never replaces
-files. On Windows, the `.exe` starts a detached helper copy in the background.
-The helper downloads the newest release `.exe` into the per-user update folder
-and replaces the app after the current process exits. macOS and Linux release
-assets are published, but automatic replacement is enabled only for Windows
-`.exe` builds.
-
-### Release Builds
-
-GitHub Actions builds and publishes release assets automatically when a tag
-matching `v*.*.*` is pushed:
-
-* `EasyMediaCompress-<tag>-windows-x64.exe`
-* `EasyMediaCompress-<tag>-macos-arm64.tar.gz`
-* `EasyMediaCompress-<tag>-linux-x64.tar.gz`
-
-Example:
-
-```powershell
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-If a tag already exists and the workflow did not run, open the `Release`
-workflow in GitHub Actions, choose **Run workflow**, and enter the existing tag
-name. The manual run checks out that tag, embeds the same version, builds the
-assets, and creates the GitHub Release.
-
-Release builds embed the version automatically from the tag name. In GitHub
-Actions this comes from `GITHUB_REF_NAME`; local builds use the latest git tag.
-If no tag is available, the build falls back to the default version in
-`compress_tool/version.py`. You can override it explicitly:
-
-```powershell
-python scripts/build.py --version 0.1.0
-```
-
-The auto-updater compares the embedded version with the latest GitHub release
-tag.
-
-## Troubleshooting
-
-### FFmpeg setup
-
-Video conversion requires `ffmpeg` and `ffprobe`. The tool checks the app
-folder and `PATH` first. If FFmpeg is missing, it tries to install it with the
-native package manager.
-
-Manual install commands:
-
-```powershell
-winget install --exact --id Gyan.FFmpeg --source winget
-```
-
-```bash
-brew install ffmpeg
-sudo apt update && sudo apt install ffmpeg
-sudo dnf install ffmpeg
-sudo pacman -Sy ffmpeg
-sudo zypper install ffmpeg
-sudo apk add ffmpeg
-```
-
-If there is no internet connection, the automatic install will fail and the
-tool will try again the next time video conversion needs FFmpeg.
-
-If `winget`, `brew`, or another supported package manager is unavailable or
-blocked by policy, install FFmpeg manually and make sure `ffmpeg` plus
-`ffprobe` are available in `PATH`.
-
-On Linux, GUI launches may need elevated privileges to install packages. The
-tool tries `pkexec` when a graphical session is available. If that is not
-installed, run the tool from a terminal so `sudo` can ask for a password, or
-install FFmpeg manually before launching the GUI.
-
-### GUI dependencies
-
-If the GUI does not start because Tkinter or TkDND is missing, install the
-platform GUI packages and rerun the app.
-
-Windows:
-
-```powershell
-pip install -r requirements.txt
-```
-
-macOS:
-
-```bash
-brew install python-tk
-pip install -r requirements.txt
-```
-
-Debian / Ubuntu:
-
-```bash
-sudo apt install python3-tk
-pip install -r requirements.txt
-```
-
-Fedora:
-
-```bash
-sudo dnf install python3-tkinter
-pip install -r requirements.txt
-```
-
-Packaged release builds include the Python application dependencies, but Linux
-desktop environments can still require native Tk/GUI libraries from the OS.
-When that happens, install the GUI package for your distribution and run the
-app again.
-
-## Usage
-
-### 1. Default Mixed-Media Mode
-
-Compress one or more videos and convert one or more photos. Directories are
-searched recursively.
-
-Windows examples:
-
-```powershell
-compress.bat video1.mp4 photo1.heic D:\Media
-python compress.py video1.mp4 photo1.heic D:\Media -crf 28 -preset fast
-python compress.py D:\Photos --image-mode original --image-format jpg
-```
-
-macOS / Linux examples:
-
-```bash
-python3 compress.py video1.mp4 photo1.heic ~/Media -crf 28 -preset fast
-python3 compress.py ~/Photos --image-mode original --image-format jpg
-compress ~/Photos --image-mode lossy
-```
-
-Videos use CRF mode by default. Images use `lossy` mode by default.
-
-* **`-crf`**: Integer Constant Rate Factor for video (default: 30).
-* **`-preset`**: FFmpeg encoding speed preset for video, for example
-  `ultrafast`, `fast`, `medium`, `slow` (default: `slow`).
-* **`--video-profile`**: Video output profile. Choices are `crf`, `size`,
-  `crf480`, `crf720`, `gif120`, `gif180`, `gif`, and `gif480`
-  (default: `crf`).
-* **`--image-mode`**: `lossy` or `original` (default: `lossy`).
-* **`--image-format`**: `jpg`, `png`, or `webp` (default: `jpg`).
-
-Default output names:
-
-* video CRF: `name_compressed.mp4`
-* video CRF + 480/720 short side: `name_compressed.mp4`
-* video GIF 120p/180p/240p/480p short side at 15 fps:
-  `name_converted.gif`
-* image lossy: `name_compressed.jpg`
-* image original: `name_converted.jpg`
-
-### 2. Video Size-Based Mode
-
-Compress videos to a fixed target size (~4.5 MB). Pass `5` as the first
-argument:
-
-```bash
-python compress.py 5 video1.mp4 /path/to/videos_folder
-```
-
-On Windows, the batch wrapper works too:
-
-```powershell
-compress.bat 5 video1.mp4 D:\Videos
-```
-
-The script calculates the required video bitrate and downscales resolution as
-needed to meet the size target. Outputs are named `name_smaller.mp4`.
-
-### 3. Image-Only Mode
-
-Use this when you only want photos processed and do not want video inputs
-considered.
-
-```bash
-python compress.py image /path/to/photos --mode lossy
-python compress.py image /path/to/photos --mode original --format jpg
-python compress.py photo IMG_001.heic --mode original --format webp
-```
-
-On systems where the executable is `python3`, use `python3` instead of `python`.
-
-Image modes:
-
-* **`lossy`**: Keeps source resolution, applies EXIF orientation, and saves with
-  JPEG/WebP quality 60.
-* **`original`**: Keeps source resolution and saves with JPEG/WebP quality 95;
-  JPEG output preserves EXIF/ICC where Pillow supports it.
-
-Image output behavior:
-
-* JPEG output flattens alpha onto a white background.
-* PNG output is optimized and preserves alpha when possible.
-* WebP output uses quality 60 in `lossy` mode and quality 95 in `original`
-  mode.
-* Source files are not deleted.
-
-### 4. GUI Mode
-
-Launch the script without any arguments or pass `--gui`:
-
-```bash
-python compress.py
-python compress.py --gui
-```
-
-On macOS / Linux, use `python3` if that is your Python command:
-
-```bash
-python3 compress.py --gui
-```
-
-Drop multiple videos or images onto the window or use the **Add Media** button.
-Conversion begins immediately in parallel threads. Each row displays per-file
-progress, and the top bar shows overall progress.
-
-GUI controls:
-
-* **Video**: Selects the profile for newly added videos: `MP4`, `5 MB`,
-  `MP4 480p`, `MP4 720p`, `GIF 120p`, `GIF 180p`, `GIF 240p`, or
-  `GIF 480p`.
-* **Photo**: Selects `lossy` or `original` for newly added images.
-* **`<>` column**: Enqueues the same file again with the alternate mode.
-* Double-click a row to open the source file's folder.
-
-The GUI remembers the last `Video` and `Photo` settings between launches.
-
-Persisted settings paths:
-
-* Windows: `%LOCALAPPDATA%\EasyMediaCompress\settings.json`
-* macOS: `~/Library/Application Support/EasyMediaCompress/settings.json`
-* Linux: `${XDG_CONFIG_HOME}/easy-media-compress/settings.json` or
-  `~/.config/easy-media-compress/settings.json`
-
-## Useful Files
-
-* **`compress.py`**: Main entry point for CLI and GUI usage.
-* **`compress.bat`**: Windows batch wrapper for console mode.
-* **`launch_gui.vbs`**: Windows helper to start the GUI without a console
-  window.
-* **`win_install.ps1`**: Windows-only PowerShell installer for context-menu
-  hooks, dependencies, and Start Menu shortcuts.
-* **`build.ps1`**: Windows wrapper for the PyInstaller build script.
-* **`scripts/build.py`**: Cross-platform PyInstaller build script for one-file
-  executables.
-* **`requirements.txt`**: Python dependencies.
-* **`requirements-build.txt`**: PyInstaller build dependency.
-
-## Notes
-
-* Video work requires FFmpeg and ffprobe; the tool can invoke supported package
-  managers when they are not already installed.
-* Image-only work does not require FFmpeg.
-* HEIC/HEIF support depends on `pillow-heif`.
-* AVIF support depends on the installed Pillow build.
-* The Windows context menu is optional and does not affect macOS or Linux usage.
+To release, set the version in `Cargo.toml`, update `Cargo.lock`, then tag the matching commit with `v<version>`. The release workflow checks the version and builds the Windows Setup, portable ZIP and migration EXE, the two macOS disk images and the Linux archive. It publishes only after all builds succeed.

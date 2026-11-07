@@ -1,112 +1,88 @@
 name: Release
-
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    tags: ['v*.*.*']
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to build, for example v0.2.0'
+        description: Existing release tag to build
         required: true
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
-    name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            platform: windows-x64
-            python: '3.12'
-          - os: macos-latest
-            platform: macos-arm64
-            python: '3.12'
-          - os: ubuntu-latest
-            platform: linux-x64
-            python: '3.12'
-
+          - {os: windows-latest, platform: windows-x64, arch: x64}
+          - {os: macos-15, platform: macos-arm64, arch: arm64}
+          - {os: macos-15-intel, platform: macos-x86_64, arch: x86_64}
+          - {os: ubuntu-22.04, platform: linux-x64, arch: x64}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref_name }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-          cache: 'pip'
-          cache-dependency-path: |
-            requirements.txt
-            requirements-build.txt
-
-      - name: Build executable
-        run: python scripts/build.py --install-deps --version "${{ inputs.tag || github.ref_name }}"
-
-      - name: Package release asset
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify version
+        shell: bash
+        run: |
+          version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml)"
+          test "$RELEASE_TAG" = "v$version"
+          mkdir -p release-assets
+      - name: Build and test Windows packages
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
-          if ("${{ inputs.tag }}" -ne "") {
-            $tag = "${{ inputs.tag }}"
-          }
-          $platform = "${{ matrix.platform }}"
-          New-Item -ItemType Directory -Path release-assets -Force | Out-Null
-
-          if ("${{ runner.os }}" -eq "Windows") {
-            $asset = "release-assets/EasyMediaCompress-$tag-$platform.exe"
-            Copy-Item -LiteralPath "dist/EasyMediaCompress.exe" -Destination $asset -Force
-          } else {
-            $asset = "release-assets/EasyMediaCompress-$tag-$platform.tar.gz"
-            tar -czf $asset -C dist EasyMediaCompress
-          }
-
-          "ASSET=$asset" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Upload release asset
-        uses: actions/upload-artifact@v4
+          .\build.ps1
+          .\scripts\smoke.ps1
+          .\scripts\setup.ps1
+          Copy-Item dist/EasyMediaCompress-Setup-x64.exe,dist/legacy/EasyMediaCompress.exe -Destination release-assets
+          Compress-Archive -LiteralPath dist/EasyMediaCompress -DestinationPath "release-assets/EasyMediaCompress-$env:RELEASE_TAG-windows-x64.zip"
+      - name: Build and test macOS package
+        if: runner.os == 'macOS'
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          brew install pkgconf dylibbundler ffmpeg libheif jpeg-turbo libpng libtiff webp little-cms2
+          bash build-macos.sh
+          cp "dist/macos-$ARCH/EasyMediaCompress-macos-$ARCH.dmg" "release-assets/EasyMediaCompress-$RELEASE_TAG-macos-$ARCH.dmg"
+      - name: Build Linux package
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libwayland-dev libxkbcommon-dev
+          cargo build --locked --release --bin EasyMediaCompress --bin compress
+          target/release/compress --version
+          mkdir -p dist/EasyMediaCompress
+          cp target/release/EasyMediaCompress target/release/compress README.md THIRD_PARTY.md dist/EasyMediaCompress/
+          tar -czf "release-assets/EasyMediaCompress-$RELEASE_TAG-linux-x64.tar.gz" -C dist EasyMediaCompress
+      - uses: actions/upload-artifact@v4
         with:
-          name: EasyMediaCompress-${{ github.ref_name }}-${{ matrix.platform }}
-          path: ${{ env.ASSET }}
+          name: ${{ matrix.platform }}
+          path: release-assets/*
           if-no-files-found: error
 
   release:
-    name: Publish GitHub release
     runs-on: ubuntu-latest
     needs: build
-
+    permissions:
+      contents: write
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag || github.ref_name }}
-
-      - name: Download release assets
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: release-assets
           merge-multiple: true
-
-      - name: Publish GitHub release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-        run: |
-          tag="${{ github.ref_name }}"
-          if [ -n "${{ inputs.tag }}" ]; then
-            tag="${{ inputs.tag }}"
-          fi
-          gh release create "$tag" \
-            release-assets/* \
-            --title "$tag" \
-            --generate-notes
+        run: gh release create "$RELEASE_TAG" release-assets/* --verify-tag --title "$RELEASE_TAG" --generate-notes
