@@ -15,7 +15,7 @@ output="$PWD/dist/macos-$arch"
 stage="$output/stage"
 app="$stage/Easy Media Compress.app"
 contents="$app/Contents"
-tools="$contents/MacOS/tools"
+tools="$contents/Resources/tools"
 mkdir -p "$tools/ffmpeg" "$tools/imagemagick" "$contents/Resources"
 cp target/release/{EasyMediaCompress,compress} "$contents/MacOS/"
 cp packaging/Info.plist "$contents/"
@@ -66,6 +66,7 @@ dylibbundler -ns -od -b \
 while IFS= read -r -d '' binary; do
     if file "$binary" | grep -q 'Mach-O'; then
         codesign --force --sign - "$binary"
+        codesign --verify --strict "$binary"
     fi
 done < <(find "$tools" -type f -print0)
 codesign --force --sign - "$contents/MacOS/compress"

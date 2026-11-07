@@ -231,6 +231,10 @@ impl Tools {
                     dir.join(family),
                     dir.to_path_buf(),
                 ]);
+                #[cfg(target_os = "macos")]
+                if let Some(contents) = dir.parent() {
+                    dirs.insert(0, contents.join("Resources").join("tools").join(family));
+                }
             }
             let override_key = if name == "magick" {
                 "MEDIA_COMPRESS_MAGICK_DIR"
