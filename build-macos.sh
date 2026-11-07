@@ -63,8 +63,27 @@ cp packaging/policy.xml "$tools/imagemagick/"
 dylibbundler -ns -od -b \
     -x "$tools/ffmpeg/ffmpeg" -x "$tools/ffmpeg/ffprobe" -x "$tools/imagemagick/magick" \
     -d "$tools/lib" -p '@loader_path/../lib/'
+
+# dylibbundler can rewrite distinct Homebrew paths to the same LC_RPATH.
+# Remove duplicate load commands before re-signing the affected Mach-O.
+duplicate_rpaths() {
+    otool -l "$1" | awk '
+        $1 == "cmd" { rpath = ($2 == "LC_RPATH") }
+        rpath && $1 == "path" {
+            sub(/^[[:space:]]*path /, "")
+            sub(/ \(offset [0-9]+\)$/, "")
+            print
+        }
+    ' | sort | uniq -d
+}
+
 while IFS= read -r -d '' binary; do
     if file "$binary" | grep -q 'Mach-O'; then
+        while duplicates="$(duplicate_rpaths "$binary")" && [[ -n "$duplicates" ]]; do
+            while IFS= read -r rpath; do
+                install_name_tool -delete_rpath "$rpath" "$binary"
+            done <<< "$duplicates"
+        done
         codesign --force --sign - "$binary"
         codesign --verify --strict "$binary"
     fi
