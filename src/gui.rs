@@ -227,7 +227,9 @@ impl App {
     }
 }
 impl eframe::App for App {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let context = ui.ctx().clone();
+        let ctx = &context;
         self.receive(ctx);
         #[cfg(windows)]
         if let Some(tag) = self
@@ -302,8 +304,8 @@ impl eframe::App for App {
             ctx.request_repaint_after(std::time::Duration::from_millis(250));
         }
 
-        egui::TopBottomPanel::top("controls").show(ctx, |ui| self.toolbar(ui));
-        egui::TopBottomPanel::bottom("footer").show(ctx, |ui| {
+        egui::Panel::top("controls").show_inside(ui, |ui| self.toolbar(ui));
+        egui::Panel::bottom("footer").show_inside(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.weak(format!("v{VERSION} · Muromtsev Nikita"));
                 ui.hyperlink_to("nikmedoed.com", "https://nikmedoed.com/");
@@ -317,7 +319,7 @@ impl eframe::App for App {
             });
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             if self.scans > 0 && !self.stopping {
                 ui.label("Scanning folders…");
             }
