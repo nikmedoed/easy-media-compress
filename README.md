@@ -4,11 +4,11 @@ Easy Media Compress is a Rust app for drag-and-drop video compression and photo 
 
 On Windows, use [Windows Setup](https://github.com/nikmedoed/easy-media-compress/releases/latest/download/EasyMediaCompress-Setup-x64.exe) for a per-user install. Setup creates a Start menu shortcut and offers an Explorer action and a `compress` command on the user PATH. In Explorer, right-click a media file or folder and choose **Easy Media Compress**. On Windows 11 this action is under **Show more options**. It opens the GUI, adds the selection to the queue and uses the saved profiles. Remove the installed app from **Settings → Apps → Installed apps**.
 
-For portable use, extract the entire Windows ZIP and open its `EasyMediaCompress.exe`. Keep the `tools` folder beside it.
+For portable use, extract the entire Windows ZIP and open its `EasyMediaCompress.exe`. The portable app sets up missing tools on first use. The Windows installer also runs this step during installation. The script checks for existing tools, tries WinGet for missing packages, then downloads verified upstream archives if needed.
 
 On macOS, open the disk image and drag **Easy Media Compress** to **Applications**. The CLI is in the app under `Contents/MacOS/compress`.
 
-The Linux archive requires `ffmpeg`, `ffprobe` and ImageMagick 7 (`magick` with HEIC support) on PATH.
+On macOS and Linux, the app checks for the tools when processing media. It tries Homebrew or APT for missing tools, then downloads standalone FFmpeg and FFprobe builds or the official Linux x86-64 ImageMagick AppImage to a per-user directory. ImageMagick on macOS and Linux ARM64 requires a system installation. An internet connection is required for setup.
 
 Drop files or folders onto the window, or use **Add Media** to open the system file picker. Processing starts automatically and results appear beside the inputs. On Windows, subsequent Explorer calls add files to the open queue. Profiles and window size are saved in `%LOCALAPPDATA%\EasyMediaCompressRust\settings.json`. On first launch the app reads the Python version's settings if available.
 
@@ -42,6 +42,8 @@ The new app imports legacy GUI preferences on first launch. For Python installs 
 
 ## Run from source
 
+On Windows, the app sets up missing tools on first use. For portable use, extract the ZIP and open the app.
+
 On Windows, run `.\dev.ps1`. It prepares the portable codecs on the first run and opens a debug GUI using Cargo. With a custom Visual Studio installation, pass `-VcVars 'D:\path\to\vcvars64.bat'`. Rerun after editing source to see changes.
 
 On macOS or Linux, put FFmpeg, ffprobe and ImageMagick 7 on PATH and run `cargo run --locked`. To try the CLI, use `cargo run --locked --bin compress -- --help`. The `MEDIA_COMPRESS_FFMPEG_DIR` and `MEDIA_COMPRESS_MAGICK_DIR` environment variables override tool resolution.
@@ -58,15 +60,14 @@ Use Rust stable, Visual Studio C++ Build Tools with a Windows SDK, `curl.exe`, a
 .\scripts\setup.ps1  # requires Inno Setup 6.3+ on the build machine
 ```
 
-The build script verifies pinned codec archives and stages the Windows x64 portable folder under `dist\EasyMediaCompress`. It locates the OpenMP DLL in the Build Tools redistributable files, or accepts a path via `-OpenMpDll`. Build downloads are cached in `.tools`.
+The build script stages the Windows x64 portable files under `dist\windows\EasyMediaCompress`. The release contains the app and documentation.
 
 For macOS, run this on the target architecture with Xcode command-line tools and Rust stable:
 
 ```sh
-brew install pkgconf dylibbundler ffmpeg libheif jpeg-turbo libpng libtiff webp little-cms2
 bash build-macos.sh
 ```
 
-The script packages the app, CLI, and codecs for the build machine's architecture, tests the bundled tools, and creates a disk image in `dist/macos-<arch>`. Homebrew is used on the build machine. The disk image uses an ad hoc signature. Public distribution through Gatekeeper requires a Developer ID signature and notarization.
+The script packages the app and CLI and creates a disk image in `dist/macos-<arch>`. The disk image uses an ad hoc signature. Public distribution through Gatekeeper requires a Developer ID signature and notarization.
 
 To release, set the version in `Cargo.toml`, update `Cargo.lock`, then tag the matching commit with `v<version>`. The release workflow checks the version and builds the Windows Setup, portable ZIP and migration EXE, the two macOS disk images and the Linux archive. It publishes only after all builds succeed.

@@ -43,16 +43,18 @@ jobs:
         shell: pwsh
         run: |
           .\build.ps1
+          choco install ffmpeg imagemagick -y
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install smoke test dependencies' }
+          $env:PATH += ';' + [Environment]::GetEnvironmentVariable('Path', 'Machine')
           .\scripts\smoke.ps1
           .\scripts\setup.ps1
           Copy-Item dist/EasyMediaCompress-Setup-x64.exe,dist/legacy/EasyMediaCompress.exe -Destination release-assets
-          Compress-Archive -LiteralPath dist/EasyMediaCompress -DestinationPath "release-assets/EasyMediaCompress-$env:RELEASE_TAG-windows-x64.zip"
+          Copy-Item dist/windows/portable.zip "release-assets/EasyMediaCompress-$env:RELEASE_TAG-windows-x64.zip"
       - name: Build and test macOS package
         if: runner.os == 'macOS'
         env:
           ARCH: ${{ matrix.arch }}
         run: |
-          brew install pkgconf dylibbundler ffmpeg libheif jpeg-turbo libpng libtiff webp little-cms2
           bash build-macos.sh
           cp "dist/macos-$ARCH/EasyMediaCompress-macos-$ARCH.dmg" "release-assets/EasyMediaCompress-$RELEASE_TAG-macos-$ARCH.dmg"
       - name: Build Linux package

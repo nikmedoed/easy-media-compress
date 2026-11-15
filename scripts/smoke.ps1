@@ -1,13 +1,14 @@
 [CmdletBinding()]
-param([string]$Package = (Join-Path $PSScriptRoot '..\dist\EasyMediaCompress'))
+param([string]$Package = (Join-Path $PSScriptRoot '..\dist\windows\EasyMediaCompress'))
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $Package = (Resolve-Path -LiteralPath $Package).Path
 $cli = Join-Path $Package 'compress.exe'
-$ffmpeg = Join-Path $Package 'tools\ffmpeg\ffmpeg.exe'
-$ffprobe = Join-Path $Package 'tools\ffmpeg\ffprobe.exe'
-$magick = Join-Path $Package 'tools\imagemagick\magick.exe'
+$pathBefore = $env:PATH
+$ffmpeg = (Get-Command ffmpeg.exe -CommandType Application).Source
+$ffprobe = (Get-Command ffprobe.exe -CommandType Application).Source
+$magick = (Get-Command magick.exe -CommandType Application).Source
 $fixtures = Join-Path $PSScriptRoot '..\tests\fixtures'
 $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $root = [IO.Directory]::CreateTempSubdirectory('compress-smoke-').FullName
@@ -33,7 +34,6 @@ function Video-Info {
 }
 
 try {
-    $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
     $env:MEDIA_COMPRESS_FFMPEG_DIR = $null
     $env:MEDIA_COMPRESS_MAGICK_DIR = $null
     $nest = (New-Item -ItemType Directory -Path "$root\медиа [1]").FullName

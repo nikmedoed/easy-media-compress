@@ -4,7 +4,7 @@ param([switch]$Uninstall)
 $ErrorActionPreference = 'Stop'
 $folder = $PSScriptRoot
 if (!(Test-Path -LiteralPath (Join-Path $folder 'EasyMediaCompress.exe'))) {
-    $folder = Join-Path $folder 'dist\EasyMediaCompress'
+    $folder = Join-Path $folder 'dist\windows\EasyMediaCompress'
 }
 $exe = Join-Path $folder 'EasyMediaCompress.exe'
 $cli = Join-Path $folder 'compress.exe'

@@ -37,7 +37,9 @@ english.CliTask=Enable the compress command in new terminals
 russian.CliTask=Добавить команду compress в PATH пользователя
 
 [Files]
-Source: "..\dist\EasyMediaCompress\*"; DestDir: "{app}"; Excludes: "win_install.ps1"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\windows\EasyMediaCompress\EasyMediaCompress.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\windows\EasyMediaCompress\compress.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\windows\EasyMediaCompress\*.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{userprograms}\Easy Media Compress"; Filename: "{app}\EasyMediaCompress.exe"; WorkingDir: "{app}"

@@ -15,7 +15,7 @@ if (!$Iscc) {
     }
 }
 if (!$Iscc) { throw 'Inno Setup compiler not found. Supply its path with -Iscc.' }
-$cli = Join-Path $root 'dist\EasyMediaCompress\compress.exe'
+$cli = Join-Path $root 'dist\windows\EasyMediaCompress\compress.exe'
 if (!(Test-Path -LiteralPath $cli)) { throw 'Run build.ps1 first.' }
 $version = & $cli --version
 if ($LASTEXITCODE -ne 0 -or $version -notmatch '^\d+\.\d+\.\d+$') { throw 'Could not read the packaged version.' }
