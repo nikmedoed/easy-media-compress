@@ -1,7 +1,9 @@
 pub mod cli;
 pub mod jobs;
 pub mod media;
+mod process;
 pub mod settings;
+mod tools;
 
 pub const APP_NAME: &str = "Easy Media Compress";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
